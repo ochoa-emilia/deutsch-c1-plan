@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Deutsch C1 · Plan de estudio</title>
+<style>
+:root{--bg:#fff8fa;--card:#fff;--p:#e8b8c7;--r:#b96f86;--t:#463b3f;--m:#88777d;--l:#f0dfe4}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#fff8fa,#fdf0f4);font-family:system-ui,sans-serif;color:var(--t)}
+.wrap{max-width:1050px;margin:auto;padding:24px 16px 48px}header{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}
+h1{margin:0;font-size:clamp(28px,5vw,40px)}h2{margin:0 0 12px}.sub,.label,.sync{color:var(--m)}.sub{margin:4px 0}.badge{padding:9px 13px;border-radius:99px;background:#f8e7ec;color:var(--r);font-weight:700;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}.card{grid-column:span 4;background:#fffffff0;border:1px solid var(--l);border-radius:22px;padding:20px;box-shadow:0 10px 30px #8c56631a}.wide{grid-column:span 8}.full{grid-column:1/-1}
+.big{font-size:34px;font-weight:800;margin:8px 0}.bar{height:11px;background:#f5e8ec;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#dca5b8,#b96f86);width:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}button{border:0;border-radius:14px;padding:11px 15px;background:#f0cbd6;color:#533e45;font-weight:750;cursor:pointer}button.secondary{background:#f7eef1}button.danger{background:#f7dddd;color:#884949}
+input,select{width:100%;padding:12px;border:1px solid var(--l);border-radius:13px;background:#fff;color:var(--t)}.settings{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.settings label{display:block;margin-bottom:6px;color:var(--m);font-size:14px}.form{display:grid;grid-template-columns:1fr 120px auto;gap:10px;align-items:end}
+.notice{padding:12px 14px;border-radius:14px;background:#fff4e9;color:#81502f;margin-top:12px;display:none}.notice.show{display:block}.auth{background:#f8edf1;border-radius:18px;padding:13px 15px;margin-bottom:16px}.status{font-weight:700}
+.timer{font-variant-numeric:tabular-nums;font-size:42px;font-weight:850;margin:6px 0 14px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:10px 6px;border-bottom:1px solid var(--l)}th{color:var(--m)}footer{text-align:center;color:var(--m);font-size:12px;margin-top:22px}
+@media(max-width:760px){.settings{grid-template-columns:1fr}.card,.wide{grid-column:1/-1}.form{grid-template-columns:1fr 110px}.form button{grid-column:1/-1}header{align-items:flex-start;flex-direction:column}}
+</style></head><body><div class="wrap">
+<header><div><h1>Deutsch C1</h1><p class="sub" id="subtitle">Plan dinámico</p></div><div class="badge" id="badge">Sin sincronizar</div></header>
+<div class="auth"><div class="row between"><div><div class="status" id="authText">Conecta tu cuenta de Google para guardar el progreso en la nube.</div><div class="sync" id="authSub">El modo local es solo un respaldo temporal.</div></div><div class="row"><button id="google">Continuar con Google</button><button id="logout" class="secondary" style="display:none">Cerrar sesión</button></div></div></div>
+<section class="grid">
+<div class="card full"><h2>⚙️ Configurar plan</h2><div class="settings"><div><label for="goalHours">Horas objetivo</label><input id="goalHours" type="number" min="1" step="1"></div><div><label for="goalDate">Fecha límite</label><input id="goalDate" type="date"></div><button id="saveSettings">Guardar configuración</button></div><div class="sync" id="settingsMsg" style="margin-top:10px">Cambiar el objetivo no borra tu historial.</div></div>
+<div class="card wide"><div class="label">Recomendación de hoy</div><div class="big" id="rec">—</div><div class="label" id="explain"></div><div class="notice" id="alert">La recomendación supera 2 h 30 min al día.</div></div>
+<div class="card"><div class="label">Días restantes</div><div class="big" id="days">—</div></div>
+<div class="card"><div class="label">Progreso global</div><div class="big" id="pct">0%</div><div class="bar"><i id="bar"></i></div><div class="label" id="hours">0 h de 600 h</div></div>
+<div class="card"><div class="label">Esta semana</div><div class="big" id="week">0 h</div></div>
+<div class="card wide"><h2>Temporizador</h2><div class="timer" id="timer">00:00:00</div><div class="row"><button id="start">Iniciar</button><button id="pause" class="secondary">Pausar</button><button id="finish">Guardar tiempo</button><button id="reset" class="danger">Reiniciar</button></div><div class="sync">Usa Date.now(), por lo que sigue contando correctamente al bloquear la pantalla.</div></div>
+<div class="card"><h2>Registrar tiempo</h2><div class="form"><input id="amount" type="number" min="0.1" step="0.1" placeholder="Cantidad"><select id="unit"><option value="min">minutos</option><option value="h">horas</option></select><button id="add">Añadir</button></div><div class="notice" id="err"></div></div>
+<div class="card full"><div class="row between"><h2>Historial</h2><button id="clear" class="danger">Borrar historial</button></div><div id="history"></div></div>
+</section><footer>600 h · C1 · 31 de diciembre de 2027 · progreso sincronizado por cuenta de Google</footer></div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import{getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import{getFirestore,doc,getDoc,setDoc}from"https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+const firebaseConfig={
+  apiKey:"AIzaSyAt8xDvDdOcPUZC4rjlYaQy_WWxHKwffrw",
+  authDomain:"deutsch-c1-16166.firebaseapp.com",
+  projectId:"deutsch-c1-16166",
+  storageBucket:"deutsch-c1-16166.firebasestorage.app",
+  messagingSenderId:"815809133908",
+  appId:"1:815809133908:web:fb268b9cdc23ce9cf35cc1"
+};
+const configured=!Object.values(firebaseConfig).some(x=>String(x).includes("PEGA_AQUI"));
+const KEY="deutsch-c1-local-v3",TKEY="deutsch-c1-timer-v3";
+const DEFAULT_SETTINGS={targetMinutes:36000,endDate:"2027-12-31"};
+let state=load(),timer=loadT(),user=null,db=null,auth=null;
+
+function load(){try{let s=JSON.parse(localStorage.getItem(KEY))||{entries:[]};s.settings=s.settings||{...DEFAULT_SETTINGS};return s}catch{return{entries:[],settings:{...DEFAULT_SETTINGS}}}}
+function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+function loadT(){try{return JSON.parse(localStorage.getItem(TKEY))||{running:false,startedAt:null,elapsed:0}}catch{return{running:false,startedAt:null,elapsed:0}}}
+function saveT(){localStorage.setItem(TKEY,JSON.stringify(timer))}
+const mins=()=>state.entries.reduce((a,e)=>a+Number(e.minutes||0),0);
+const target=()=>Number(state.settings?.targetMinutes)||DEFAULT_SETTINGS.targetMinutes;
+const end=()=>{let [y,m,d]=(state.settings?.endDate||DEFAULT_SETTINGS.endDate).split("-").map(Number);return new Date(y,m-1,d,23,59,59)};
+const days=()=>Math.max(0,Math.ceil((end()-new Date())/86400000));
+const rec=()=>days()?Math.max(0,target()-mins())/days():0;
+const fmt=m=>{m=Math.max(0,Math.round(m));let h=Math.floor(m/60),x=m%60;return h?`${h} h ${x} min`:`${x} min`};
+function weekStart(){let d=new Date(),n=(d.getDay()+6)%7;d.setHours(0,0,0,0);d.setDate(d.getDate()-n);return d}
+function week(){let s=weekStart();return state.entries.filter(e=>new Date(e.timestamp)>=s).reduce((a,e)=>a+e.minutes,0)}
+function render(){
+ let total=mins(),TARGET=target(),p=Math.min(100,total/TARGET*100),r=rec();
+ document.getElementById("rec").textContent=fmt(r);document.getElementById("days").textContent=days();document.getElementById("pct").textContent=p.toFixed(1)+"%";document.getElementById("bar").style.width=p+"%";document.getElementById("hours").textContent=`${(total/60).toFixed(1)} h de ${(TARGET/60).toFixed(1)} h`;document.getElementById("week").textContent=fmt(week());document.getElementById("explain").textContent=`Quedan ${fmt(TARGET-total)} repartidos entre ${days()} días.`;document.getElementById("alert").classList.toggle("show",r>150);
+ document.getElementById("goalHours").value=(TARGET/60).toFixed(TARGET%60?1:0);document.getElementById("goalDate").value=state.settings.endDate;
+ document.getElementById("subtitle")&&(document.getElementById("subtitle").textContent=`Plan dinámico · objetivo ${(TARGET/60).toFixed(1)} horas · ${state.settings.endDate}`);
+ let rows=[...state.entries].sort((a,b)=>b.timestamp-a.timestamp);document.getElementById("history").innerHTML=rows.length?`<table><tr><th>Fecha</th><th>Tiempo</th><th>Origen</th></tr>${rows.map(e=>`<tr><td>${new Date(e.timestamp).toLocaleString("es-CL",{dateStyle:"medium",timeStyle:"short"})}</td><td>${fmt(e.minutes)}</td><td>${e.source}</td></tr>`).join("")}</table>`:"<div class='label'>Todavía no hay sesiones.</div>";updateTimer()
+}
+function addEntry(m,source){if(!Number.isFinite(m)||m<=0)throw Error("Introduce una cantidad mayor que 0.");state.entries.push({id:crypto.randomUUID(),minutes:Math.round(m*10)/10,source,timestamp:Date.now()});save();render();cloudSave()}
+function updateTimer(){let ms=timer.elapsed+(timer.running?Date.now()-timer.startedAt:0),h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000);document.getElementById("timer").textContent=[h,m,s].map(x=>String(x).padStart(2,"0")).join(":")}
+setInterval(updateTimer,500);
+const $=id=>document.getElementById(id);
+const authText=$("authText"),authSub=$("authSub"),badge=$("badge"),google=$("google"),logout=$("logout");
+const startBtn=$("start"),pauseBtn=$("pause"),resetBtn=$("reset"),finishBtn=$("finish"),addBtn=$("add"),clearBtn=$("clear"),saveSettingsBtn=$("saveSettings");
+const amount=$("amount"),unit=$("unit"),err=$("err"),goalHours=$("goalHours"),goalDate=$("goalDate"),settingsMsg=$("settingsMsg");
+startBtn.addEventListener("click",()=>{if(!timer.running){timer.running=true;timer.startedAt=Date.now();saveT();render()}});
+pauseBtn.addEventListener("click",()=>{if(timer.running){timer.elapsed+=Date.now()-timer.startedAt;timer.running=false;timer.startedAt=null;saveT();render()}});
+resetBtn.addEventListener("click",()=>{timer={running:false,startedAt:null,elapsed:0};saveT();render()});
+finishBtn.addEventListener("click",()=>{let ms=timer.elapsed+(timer.running?Date.now()-timer.startedAt:0);if(ms<6000)return;timer={running:false,startedAt:null,elapsed:0};saveT();addEntry(ms/60000,"temporizador")});
+addBtn.addEventListener("click",()=>{let n=Number(amount.value),m=unit.value==="h"?n*60:n;try{addEntry(m,"manual");amount.value="";err.classList.remove("show")}catch(e){err.textContent=e.message;err.classList.add("show")}});
+clearBtn.addEventListener("click",()=>{if(confirm("¿Borrar todo el historial?")){state.entries=[];save();render();cloudSave()}});
+saveSettingsBtn.addEventListener("click",()=>{let h=Number(goalHours.value),date=goalDate.value;if(!Number.isFinite(h)||h<=0){settingsMsg.textContent="Introduce horas mayores que 0.";return}if(!date){settingsMsg.textContent="Selecciona una fecha válida.";return}let [y,m,d]=date.split("-").map(Number);if(new Date(y,m-1,d,23,59,59)<new Date()){settingsMsg.textContent="La fecha debe ser hoy o futura.";return}state.settings={targetMinutes:Math.round(h*60),endDate:date};save();render();cloudSave();settingsMsg.textContent="Configuración guardada ✓"});
+
+async function sync(){
+ if(!user)return;let ref=doc(db,"users",user.uid,"app","study"),snap=await getDoc(ref);
+ if(snap.exists()){let cloud=snap.data().entries||[],map=new Map([...cloud,...state.entries].map(e=>[e.id,e]));state={entries:[...map.values()].sort((a,b)=>a.timestamp-b.timestamp),settings:snap.data().settings||state.settings||{...DEFAULT_SETTINGS}}}
+ save();render();await setDoc(ref,{entries:state.entries,settings:state.settings,updatedAt:Date.now(),version:4},{merge:true});authSub.textContent="Todo sincronizado correctamente ✓";
+}
+let pending;function cloudSave(){if(!user)return;clearTimeout(pending);pending=setTimeout(async()=>{try{await setDoc(doc(db,"users",user.uid,"app","study"),{entries:state.entries,settings:state.settings,updatedAt:Date.now(),version:4},{merge:true});authSub.textContent="Guardado en la nube ✓"}catch(e){authSub.textContent="Error de sincronización: "+e.message}},400)}
+$("google").addEventListener("click",async()=>{try{await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){alert(e.message)}});
+$("logout").addEventListener("click",()=>signOut(auth));
+async function init(){
+ if(!configured){authText.textContent="Firebase aún no está configurado. Sigue README.txt para conectar Google y la nube.";google.style.display="none";return}
+ const app=initializeApp(firebaseConfig);auth=getAuth(app);db=getFirestore(app);
+ onAuthStateChanged(auth,async u=>{user=u;if(u){authText.textContent=`Sincronizado como ${u.displayName||u.email}`;badge.textContent="☁️ Sincronizado";google.style.display="none";logout.style.display="";await sync()}else{badge.textContent="Sin sincronizar";google.style.display="";logout.style.display="none"}});
+}
+render();init();
+</script></body></html>

@@ -1,8 +1,42 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/app/{document} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    match /users/{userId}/app/study {
+
+      allow read: if request.auth != null
+                  && request.auth.uid == userId;
+
+      allow create, update: if request.auth != null
+                            && request.auth.uid == userId
+
+                            // El documento solo puede contener estos campos.
+                            && request.resource.data.keys().hasOnly([
+                              'entries',
+                              'settings',
+                              'updatedAt',
+                              'version'
+                            ])
+
+                            // Estructura general.
+                            && request.resource.data.entries is list
+                            && request.resource.data.settings is map
+                            && request.resource.data.updatedAt is number
+                            && request.resource.data.version is int
+                            && request.resource.data.version == 5
+
+                            // Configuración del plan.
+                            && request.resource.data.settings.keys().hasOnly([
+                              'targetMinutes',
+                              'endDate'
+                            ])
+                            && request.resource.data.settings.targetMinutes is int
+                            && request.resource.data.settings.targetMinutes > 0
+                            && request.resource.data.settings.endDate is string;
+
+      // La aplicación nunca elimina el documento completo.
+      allow delete: if false;
     }
   }
 }

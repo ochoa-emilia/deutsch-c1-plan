@@ -1,48 +1,58 @@
-# Deutsch-c1-plan
-My app to reach C1 in german before 2028.
-Deutsch C1 Plan
+# Deutsch C1 Plan
 
-A web application designed to help me reach German C1 level through a flexible and measurable study plan.
+A web application designed to help me reach German C1 through a flexible and measurable long-term study plan.
 
-The application tracks a total goal of 600 study hours (It can be modified).
+The application tracks progress toward a configurable study-hour goal and target date. By default, the plan is set to 600 study hours by December 31, 2027.
 
-Instead of requiring a fixed amount of study time every day, it automatically calculates a recommended daily study time based on:
+Instead of requiring a fixed amount of study time every day, the application dynamically calculates a recommended daily study time based on:
+
 - Remaining study hours
-- Remaining days until the target day
+- Remaining days until the target date
 - Previous study progress
 
-Studying more on one day reduces future daily recommendations, while days without study are automatically redistributed across the remaining time.
+Studying more than the daily recommendation reduces future recommendations, while days without study are automatically redistributed across the remaining time.
 
 ## Features
 
+- Dynamic daily study recommendations
 - Study progress tracking
--  Integrated study timer
--  Manual study-time entries
--  Dynamic daily study recommendations
--  Weekly study summary
--  Study history
--  Cloud synchronization with Firebase
--  Google authentication
--  Responsive design for desktop and mobile
+- Integrated study timer
+- Manual study-time entries
+- Weekly study summary
+- Study history
+- Individual history entry deletion
+- Configurable study goal and target date
+- Google authentication
+- Cloud synchronization across devices
+- Responsive design for desktop and mobile
 
-##  Technologies
+## Technologies
 
 - HTML
 - CSS
 - JavaScript
 - Firebase Authentication
 - Cloud Firestore
+- Firebase App Check
 - Firebase Hosting
 - GitHub
 
-##  Development
+## Security & Data
 
-This project was developed with AI assistance.
+User study data is stored in Cloud Firestore and associated with each authenticated Google account.
 
-I defined the project requirements, functionality, study-tracking logic, user experience, and design direction. AI tools were used to assist with code generation and implementation.
+The project uses:
 
-I also configured and manage the Firebase infrastructure, including authentication, Firestore database, security rules, hosting, and deployment.
+- Firestore Security Rules for user-level data isolation
+- Firebase App Check
+- Restricted Google API configuration
+- Per-user local storage
+- Google Authentication
 
-##  Status
+## Development
 
-The project is currently under development.
+I designed the application requirements, study-tracking logic, user experience, and interface, and implemented the project using AI-assisted development.
+
+I configured and manage the Firebase infrastructure, including authentication, Firestore, security rules, App Check, hosting, and deployment.
+
+AI tools were used as part of the development process for code generation, debugging, and implementation assistance.

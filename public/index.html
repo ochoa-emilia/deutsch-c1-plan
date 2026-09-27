@@ -31,6 +31,7 @@ input,select{width:100%;padding:12px;border:1px solid var(--l);border-radius:13p
 import{initializeApp}from"https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import{getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import{getFirestore,doc,getDoc,setDoc}from"https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import{initializeAppCheck,ReCaptchaEnterpriseProvider}from"https://www.gstatic.com/firebasejs/12.19.0/firebase-app-check.js";
 
 const firebaseConfig={
   apiKey:"AIzaSyAt8xDvDdOcPUZC4rjlYaQy_WWxHKwffrw",
@@ -41,14 +42,20 @@ const firebaseConfig={
   appId:"1:815809133908:web:fb268b9cdc23ce9cf35cc1"
 };
 const configured=!Object.values(firebaseConfig).some(x=>String(x).includes("PEGA_AQUI"));
-const KEY="deutsch-c1-local-v3",TKEY="deutsch-c1-timer-v3";
+const LEGACY_KEY="deutsch-c1-local-v3",LEGACY_TKEY="deutsch-c1-timer-v3";
+const GUEST_KEY="deutsch-c1-guest-v5",GUEST_TKEY="deutsch-c1-guest-timer-v5";
 const DEFAULT_SETTINGS={targetMinutes:36000,endDate:"2027-12-31"};
-let state=load(),timer=loadT(),user=null,db=null,auth=null;
-
-function load(){try{let s=JSON.parse(localStorage.getItem(KEY))||{entries:[]};s.settings=s.settings||{...DEFAULT_SETTINGS};return s}catch{return{entries:[],settings:{...DEFAULT_SETTINGS}}}}
-function save(){localStorage.setItem(KEY,JSON.stringify(state))}
-function loadT(){try{return JSON.parse(localStorage.getItem(TKEY))||{running:false,startedAt:null,elapsed:0}}catch{return{running:false,startedAt:null,elapsed:0}}}
-function saveT(){localStorage.setItem(TKEY,JSON.stringify(timer))}
+let user=null,db=null,auth=null;
+const blankState=()=>({entries:[],settings:{...DEFAULT_SETTINGS}});
+const blankTimer=()=>({running:false,startedAt:null,elapsed:0});
+const stateKey=uid=>uid?`deutsch-c1-user-${uid}-v5`:GUEST_KEY;
+const timerKey=uid=>uid?`deutsch-c1-user-${uid}-timer-v5`:GUEST_TKEY;
+function loadState(uid=null){try{let s=JSON.parse(localStorage.getItem(stateKey(uid)))||blankState();s.entries=Array.isArray(s.entries)?s.entries:[];s.settings=s.settings||{...DEFAULT_SETTINGS};return s}catch{return blankState()}}
+function save(){localStorage.setItem(stateKey(user?.uid||null),JSON.stringify(state))}
+function loadTimer(uid=null){try{return JSON.parse(localStorage.getItem(timerKey(uid)))||blankTimer()}catch{return blankTimer()}}
+function saveT(){localStorage.setItem(timerKey(user?.uid||null),JSON.stringify(timer))}
+function loadLegacy(){try{let s=JSON.parse(localStorage.getItem(LEGACY_KEY));if(!s)return null;s.entries=Array.isArray(s.entries)?s.entries:[];s.settings=s.settings||{...DEFAULT_SETTINGS};return s}catch{return null}}
+let state=loadState(),timer=loadTimer();
 const mins=()=>state.entries.reduce((a,e)=>a+Number(e.minutes||0),0);
 const target=()=>Number(state.settings?.targetMinutes)||DEFAULT_SETTINGS.targetMinutes;
 const end=()=>{let [y,m,d]=(state.settings?.endDate||DEFAULT_SETTINGS.endDate).split("-").map(Number);return new Date(y,m-1,d,23,59,59)};
@@ -62,7 +69,7 @@ function render(){
  document.getElementById("rec").textContent=fmt(r);document.getElementById("days").textContent=days();document.getElementById("pct").textContent=p.toFixed(1)+"%";document.getElementById("bar").style.width=p+"%";document.getElementById("hours").textContent=`${(total/60).toFixed(1)} h de ${(TARGET/60).toFixed(1)} h`;document.getElementById("week").textContent=fmt(week());document.getElementById("explain").textContent=`Quedan ${fmt(TARGET-total)} repartidos entre ${days()} días.`;document.getElementById("alert").classList.toggle("show",r>150);
  document.getElementById("goalHours").value=(TARGET/60).toFixed(TARGET%60?1:0);document.getElementById("goalDate").value=state.settings.endDate;
  document.getElementById("subtitle")&&(document.getElementById("subtitle").textContent=`Plan dinámico · objetivo ${(TARGET/60).toFixed(1)} horas · ${state.settings.endDate}`);
- let rows=[...state.entries].sort((a,b)=>b.timestamp-a.timestamp);document.getElementById("history").innerHTML=rows.length?`<table><tr><th>Fecha</th><th>Tiempo</th><th>Origen</th></tr>${rows.map(e=>`<tr><td>${new Date(e.timestamp).toLocaleString("es-CL",{dateStyle:"medium",timeStyle:"short"})}</td><td>${fmt(e.minutes)}</td><td>${e.source}</td></tr>`).join("")}</table>`:"<div class='label'>Todavía no hay sesiones.</div>";updateTimer()
+ let rows=[...state.entries].sort((a,b)=>b.timestamp-a.timestamp);document.getElementById("history").innerHTML=rows.length?`<table><tr><th>Fecha</th><th>Tiempo</th><th>Origen</th><th>Acción</th></tr>${rows.map(e=>`<tr><td>${new Date(e.timestamp).toLocaleString("es-CL",{dateStyle:"medium",timeStyle:"short"})}</td><td>${fmt(e.minutes)}</td><td>${e.source==="temporizador"?"temporizador":"manual"}</td><td><button class="danger delete-entry" data-id="${e.id}">Eliminar</button></td></tr>`).join("")}</table>`:"<div class='label'>Todavía no hay sesiones.</div>";updateTimer()
 }
 function addEntry(m,source){if(!Number.isFinite(m)||m<=0)throw Error("Introduce una cantidad mayor que 0.");state.entries.push({id:crypto.randomUUID(),minutes:Math.round(m*10)/10,source,timestamp:Date.now()});save();render();cloudSave()}
 function updateTimer(){let ms=timer.elapsed+(timer.running?Date.now()-timer.startedAt:0),h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000);document.getElementById("timer").textContent=[h,m,s].map(x=>String(x).padStart(2,"0")).join(":")}
@@ -77,20 +84,66 @@ resetBtn.addEventListener("click",()=>{timer={running:false,startedAt:null,elaps
 finishBtn.addEventListener("click",()=>{let ms=timer.elapsed+(timer.running?Date.now()-timer.startedAt:0);if(ms<6000)return;timer={running:false,startedAt:null,elapsed:0};saveT();addEntry(ms/60000,"temporizador")});
 addBtn.addEventListener("click",()=>{let n=Number(amount.value),m=unit.value==="h"?n*60:n;try{addEntry(m,"manual");amount.value="";err.classList.remove("show")}catch(e){err.textContent=e.message;err.classList.add("show")}});
 clearBtn.addEventListener("click",()=>{if(confirm("¿Borrar todo el historial?")){state.entries=[];save();render();cloudSave()}});
+$("history").addEventListener("click",e=>{
+ const btn=e.target.closest(".delete-entry");
+ if(!btn)return;
+ const entry=state.entries.find(x=>x.id===btn.dataset.id);
+ if(!entry)return;
+ if(confirm(`¿Eliminar esta sesión de ${fmt(entry.minutes)}?`)){
+  state.entries=state.entries.filter(x=>x.id!==entry.id);
+  save();render();cloudSave();
+ }
+});
 saveSettingsBtn.addEventListener("click",()=>{let h=Number(goalHours.value),date=goalDate.value;if(!Number.isFinite(h)||h<=0){settingsMsg.textContent="Introduce horas mayores que 0.";return}if(!date){settingsMsg.textContent="Selecciona una fecha válida.";return}let [y,m,d]=date.split("-").map(Number);if(new Date(y,m-1,d,23,59,59)<new Date()){settingsMsg.textContent="La fecha debe ser hoy o futura.";return}state.settings={targetMinutes:Math.round(h*60),endDate:date};save();render();cloudSave();settingsMsg.textContent="Configuración guardada ✓"});
 
 async function sync(){
- if(!user)return;let ref=doc(db,"users",user.uid,"app","study"),snap=await getDoc(ref);
- if(snap.exists()){let cloud=snap.data().entries||[],map=new Map([...cloud,...state.entries].map(e=>[e.id,e]));state={entries:[...map.values()].sort((a,b)=>a.timestamp-b.timestamp),settings:snap.data().settings||state.settings||{...DEFAULT_SETTINGS}}}
- save();render();await setDoc(ref,{entries:state.entries,settings:state.settings,updatedAt:Date.now(),version:4},{merge:true});authSub.textContent="Todo sincronizado correctamente ✓";
+ if(!user)return;
+ const uid=user.uid,ref=doc(db,"users",uid,"app","study"),snap=await getDoc(ref);
+ if(snap.exists()){
+  let cloud=snap.data().entries||[],map=new Map([...cloud,...state.entries].map(e=>[e.id,e]));
+  state={entries:[...map.values()].sort((a,b)=>a.timestamp-b.timestamp),settings:snap.data().settings||state.settings||{...DEFAULT_SETTINGS}};
+ }else if(!state.entries.length){
+  const legacy=loadLegacy();
+  if(legacy?.entries?.length&&confirm("Encontré datos locales de una versión anterior. ¿Quieres asociarlos a esta cuenta de Google?"))state=legacy;
+ }
+ save();render();
+ await setDoc(ref,{entries:state.entries,settings:state.settings,updatedAt:Date.now(),version:5},{merge:true});
+ // Si la nube ya contiene los datos del usuario, elimina el almacenamiento antiguo compartido.
+ if(snap.exists()){localStorage.removeItem(LEGACY_KEY);localStorage.removeItem(LEGACY_TKEY)}
+ authSub.textContent="Todo sincronizado correctamente ✓";
 }
-let pending;function cloudSave(){if(!user)return;clearTimeout(pending);pending=setTimeout(async()=>{try{await setDoc(doc(db,"users",user.uid,"app","study"),{entries:state.entries,settings:state.settings,updatedAt:Date.now(),version:4},{merge:true});authSub.textContent="Guardado en la nube ✓"}catch(e){authSub.textContent="Error de sincronización: "+e.message}},400)}
+let pending;function cloudSave(){
+ if(!user)return;
+ const uid=user.uid;
+ clearTimeout(pending);
+ pending=setTimeout(async()=>{
+  if(!auth?.currentUser||auth.currentUser.uid!==uid)return;
+  try{await setDoc(doc(db,"users",uid,"app","study"),{entries:state.entries,settings:state.settings,updatedAt:Date.now(),version:5},{merge:true});authSub.textContent="Guardado en la nube ✓"}catch(e){authSub.textContent="Error de sincronización: "+e.message}
+ },400)
+}
 $("google").addEventListener("click",async()=>{try{await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){alert(e.message)}});
 $("logout").addEventListener("click",()=>signOut(auth));
 async function init(){
  if(!configured){authText.textContent="Firebase aún no está configurado. Sigue README.txt para conectar Google y la nube.";google.style.display="none";return}
- const app=initializeApp(firebaseConfig);auth=getAuth(app);db=getFirestore(app);
- onAuthStateChanged(auth,async u=>{user=u;if(u){authText.textContent=`Sincronizado como ${u.displayName||u.email}`;badge.textContent="☁️ Sincronizado";google.style.display="none";logout.style.display="";await sync()}else{badge.textContent="Sin sincronizar";google.style.display="";logout.style.display="none"}});
+ const app=initializeApp(firebaseConfig);
+  initializeAppCheck(app,{
+   provider:new ReCaptchaEnterpriseProvider("6Lc2ItEtAAAAAK0GEV4Y8XX5ktjwRoGiD-Z2WjiI"),
+   isTokenAutoRefreshEnabled:true
+  });
+  auth=getAuth(app);db=getFirestore(app);
+ onAuthStateChanged(auth,async u=>{
+  clearTimeout(pending);
+  user=u;
+  if(u){
+   state=loadState(u.uid);timer=loadTimer(u.uid);render();
+   authText.textContent="Sincronización en la nube activa";badge.textContent="☁️ Sincronizado";google.style.display="none";logout.style.display="";
+   try{await sync()}catch(e){authSub.textContent="Error de sincronización: "+e.message}
+  }else{
+   state=loadState();timer=loadTimer();render();
+   authText.textContent="Inicia sesión para sincronizar entre dispositivos";authSub.textContent="Tus datos de cada cuenta se mantienen separados.";
+   badge.textContent="Sin sincronizar";google.style.display="";logout.style.display="none";
+  }
+ });
 }
 render();init();
 </script></body></html>

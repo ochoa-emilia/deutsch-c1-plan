@@ -1,6 +1,6 @@
 # deutsch-c1-plan
 My app to reach C1 in german before 2028.
-# 🇩🇪 Deutsch C1 Plan
+Deutsch C1 Plan
 
 A web application designed to help me reach German C1 level through a flexible and measurable study plan.
 
